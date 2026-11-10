@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chat-v2 · simulação</title>
+<style>
+  /*
+   * Simulação do chat de 2016. Nada aqui fala com servidor e nada do que é
+   * digitado vira HTML ou código: as "pegadinhas" são uma lista fixa de
+   * efeitos, e os outros participantes são personagens com roteiro.
+   */
+  * { box-sizing: border-box }
+  html, body { height: 100%; margin: 0 }
+  body { font: 15px/1.45 system-ui, sans-serif; background: #ddd; color: #222; display: flex; flex-direction: column; overflow: hidden }
+
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .5rem .75rem; background: #3f51b5; color: #fff }
+  .bar strong { font-size: 1.05rem; margin-right: auto }
+  button { font: inherit; cursor: pointer; border: 1px solid #0003; border-radius: 4px; padding: .3rem .6rem; background: #fff; color: #222 }
+  button:hover { background: #eee }
+  button[aria-pressed='true'] { background: #ffeb3b }
+  .bar button { border-color: #fff5; background: #ffffff22; color: #fff }
+  .bar button:hover { background: #ffffff44 }
+
+  #caption { margin: 0; padding: .55rem .75rem; background: #fff8c5; color: #3b3200; font-size: .9rem; border-bottom: 1px solid #0002; min-height: 2.6rem }
+  #caption time { font: 600 .8rem ui-monospace, monospace; margin-right: .5rem }
+
+  #stage { position: relative; flex: 1; min-height: 0; padding: .75rem; overflow: hidden; background: #ddd; transition: background .4s }
+  #messages { height: 100%; overflow-y: auto; background: #fff; padding: .6rem .9rem; box-shadow: 0 0 9px #787878 }
+  .message { margin: .15rem 0; overflow-wrap: anywhere }
+  .message .who { font-weight: 600 }
+  .message .when { color: #888; font-size: .8em }
+  .message.system { color: #777; font-style: italic }
+  .picture { display: inline-grid; place-items: center; width: 9rem; height: 6rem; margin: .3rem 0; border-radius: 4px; color: #fff; font: 600 .8rem ui-monospace, monospace; background: repeating-linear-gradient(45deg, #ff2194 0 12px, #c821ff 12px 24px) }
+  .player { display: inline-flex; align-items: center; gap: .5rem; margin: .3rem 0; padding: .3rem .7rem; border-radius: 99px; background: #eee; font: .8rem ui-monospace, monospace }
+
+  form { display: flex; flex-wrap: wrap; gap: .4rem; padding: .6rem .75rem; background: #ddd }
+  form input { flex: 1 1 12rem; font: inherit; padding: .4rem .6rem; border: 1px solid #0004; border-radius: 4px }
+
+  /* Efeitos */
+  #stage.bg-1 { background: repeating-linear-gradient(45deg, #ff2194 0 24px, #3f21ff 24px 48px) }
+  #stage.bg-2 { background: repeating-conic-gradient(#209e2a 0 25%, #c0e334 0 50%) 0 0 / 48px 48px }
+  #stage.bg-3 { background: radial-gradient(circle at 30% 30%, #f58e27, #fc4955 60%, #c821ff) }
+  #stage.shake { animation: shake .12s linear 8 }
+  @keyframes shake { 25% { transform: translate(6px, -4px) } 75% { transform: translate(-6px, 4px) } }
+  #oloco { position: absolute; inset: 0; display: none; pointer-events: none; overflow: hidden; background: #fff }
+  #oloco.on { display: block }
+  #oloco span { position: absolute; font: 800 clamp(1.5rem, 6vw, 3rem) system-ui; color: #f58e27; white-space: nowrap; animation: bounce-x 2.3s linear infinite alternate, bounce-y 1.7s linear infinite alternate }
+  @keyframes bounce-x { from { left: 0 } to { left: calc(100% - 12ch) } }
+  @keyframes bounce-y { from { top: 0 } to { top: calc(100% - 1.5em) } }
+  @media (prefers-reduced-motion: reduce) {
+    #stage.shake, #oloco span { animation: none }
+    #oloco span { inset: 40% auto auto 10% }
+  }
+
+  /* Pele de agosto: o terminal */
+  body.terminal { background: #000; color: #00a507; font-family: verdana, sans-serif }
+  body.terminal .bar { background: #000; border-bottom: 1px solid #00a50755; color: #00a507 }
+  body.terminal .bar button, body.terminal form button { background: #000; color: #00a507; border-color: #00a50788 }
+  body.terminal #caption { background: #001a01; color: #7fdc84; border-color: #00a50744 }
+  body.terminal #stage:not(.bg-1):not(.bg-2):not(.bg-3) { background: #000 }
+  body.terminal #messages { background: #000; box-shadow: none; padding: 0 }
+  body.terminal .message .who, body.terminal .message .when { color: inherit !important; font-weight: 400 }
+  body.terminal .message .when { display: none }
+  body.terminal .message.title { text-align: center }
+  body.terminal form { background: #000 }
+  body.terminal form input { background: #000; color: #00a507; border: 0; border-left: 10px solid #00a507; border-radius: 0; font-size: 1.1rem; outline: 0 }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <strong id="title">Chat dos amigos</strong>
+  <button id="replay" type="button">▶ Reviver 2016</button>
+  <button id="skin" type="button" aria-pressed="false">modo terminal</button>
+  <button id="sound" type="button" aria-pressed="false">som</button>
+  <button id="undo" type="button">desfazer tudo</button>
+</div>
+
+<p id="caption">Você está numa sala com três colegas imaginários. Escreva algo, ou use os botões abaixo para pregar uma peça em todo mundo. Nada sai desta página.</p>
+
+<div id="stage">
+  <div id="messages" aria-live="polite"></div>
+  <div id="oloco"><span></span></div>
+</div>
+
+<form id="form" autocomplete="off">
+  <input id="text" placeholder="mensagem, ou: fundo · som · tremer · oloco texto · cls · --n nome" aria-label="Mensagem">
+  <button type="button" data-effect="fundo">fundo</button>
+  <button type="button" data-effect="som">som</button>
+  <button type="button" data-effect="tremer">tremer</button>
+  <button type="button" data-effect="oloco">oloco</button>
+</form>
+
+<script>
+(() => {
+  'use strict'
+
+  // Os dois geradores abaixo usam itens das listas originais de 2016.
+  const FIRST_NAMES = ['Chaves', 'Link', 'HueHue', 'Nerd', 'PogMan', 'Fofão', 'Bátimã', 'Gocu', 'Kiko', 'Astronauta', 'Faustão', 'Palmeiras', 'Dona Florinda', 'Anakin', 'Dollyinho', 'Snoopy']
+  const LAST_NAMES = ['do bonde', 'of Bel Air', 'que mora logo ali', 'no ar', 'Tranquilino', 'orientado à objeto', 'da zoeira', 'da Silva', 'não tem mundial', 'do oriente', 'Skywalker', 'Boladão', 'pai de família', 'diet']
+  const COLORS = ['FF2194', 'C821FF', '3F21FF', '67DBCE', 'FC4955', '209E2A', 'F58E27', 'C0E334', 'FF0000']
+  const pick = (list) => list[Math.floor(Math.random() * list.length)]
+  const randomName = () => `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`
+
+  const stage = document.getElementById('stage')
+  const messages = document.getElementById('messages')
+  const caption = document.getElementById('caption')
+  const olocoLayer = document.getElementById('oloco')
+  const input = document.getElementById('text')
+  const defaultCaption = caption.textContent
+
+  const me = { name: randomName(), color: pick(COLORS) }
+  const friends = [0, 1, 2].map(() => ({ name: randomName(), color: pick(COLORS) }))
+  const everyone = [me, ...friends]
+  const realNames = everyone.map((person) => person.name)
+
+  let soundOn = false
+  let timers = []
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms))
+
+  // --- Mensagens: sempre texto, nunca HTML ----------------------------------
+
+  function clock() {
+    return new Date().toLocaleTimeString('pt-BR')
+  }
+
+  function addLine(build, className = '') {
+    const line = document.createElement('div')
+    line.className = `message ${className}`
+    build(line)
+    messages.append(line)
+    messages.scrollTop = messages.scrollHeight
+    return line
+  }
+
+  function say(person, text, attachment) {
+    const terminal = document.body.classList.contains('terminal')
+    addLine((line) => {
+      const who = document.createElement('span')
+      who.className = 'who'
+      who.style.color = `#${person.color}`
+      who.textContent = terminal ? 'Anonymous' : person.name
+      const when = document.createElement('span')
+      when.className = 'when'
+      when.textContent = ` (${clock()})`
+      const body = document.createElement('span')
+      line.append(who, when, terminal ? ' - ' : ': ', body)
+      if (terminal) typewrite(body, text)
+      else body.textContent = text
+      if (attachment) line.append(document.createElement('br'), attachment)
+    })
+  }
+
+  function system(text, className = 'system') {
+    addLine((line) => {
+      line.textContent = text
+    }, className)
+  }
+
+  // O efeito de máquina de escrever do terminal de agosto, letra por letra.
+  function typewrite(element, text, speed = 20 + Math.floor(Math.random() * 20)) {
+    ;[...text].forEach((letter, index) => {
+      later(() => {
+        element.textContent += letter
+        messages.scrollTop = messages.scrollHeight
+      }, speed * (index + 1))
+    })
+  }
+
+  function badge(className, label) {
+    const element = document.createElement('span')
+    element.className = className
+    element.textContent = label
+    return element
+  }
+
+  // --- Efeitos: uma lista fechada -------------------------------------------
+
+  let audio
+  function beep() {
+    if (!soundOn) return system('♪ (som desligado: ligue no botão "som" para ouvir)')
+    audio ??= new AudioContext()
+    ;[523, 659, 784, 1047, 784, 1047].forEach((frequency, index) => {
+      const oscillator = audio.createOscillator()
+      const gain = audio.createGain()
+      oscillator.type = 'square'
+      oscillator.frequency.value = frequency
+      gain.gain.value = 0.05
+      oscillator.connect(gain).connect(audio.destination)
+      oscillator.start(audio.currentTime + index * 0.13)
+      oscillator.stop(audio.currentTime + index * 0.13 + 0.11)
+    })
+  }
+
+  let backgroundIndex = 0
+  const effects = {
+    fundo() {
+      stage.classList.remove('bg-1', 'bg-2', 'bg-3')
+      backgroundIndex = (backgroundIndex % 3) + 1
+      stage.classList.add(`bg-${backgroundIndex}`)
+    },
+    som: beep,
+    tremer() {
+      stage.classList.remove('shake')
+      void stage.offsetWidth
+      stage.classList.add('shake')
+    },
+    oloco(text) {
+      olocoLayer.firstElementChild.textContent = text || 'ÔLOCO, MEU!'
+      olocoLayer.classList.add('on')
+      later(() => olocoLayer.classList.remove('on'), 6000)
+    },
+    cls() {
+      messages.replaceChildren()
+    },
+    rename(name) {
+      everyone.forEach((person) => {
+        person.name = name
+      })
+    },
+  }
+
+  function prank(person, effect, argument) {
+    effects[effect](argument)
+    if (effect !== 'cls') system(`${document.body.classList.contains('terminal') ? 'Anonymous' : person.name} executou um script!`)
+  }
+
+  function undoAll() {
+    timers.forEach(clearTimeout)
+    timers = []
+    stage.classList.remove('bg-1', 'bg-2', 'bg-3', 'shake')
+    olocoLayer.classList.remove('on')
+    everyone.forEach((person, index) => {
+      person.name = realNames[index]
+    })
+    setTerminal(false)
+    caption.textContent = defaultCaption
+  }
+
+  function setTerminal(on) {
+    document.body.classList.toggle('terminal', on)
+    document.getElementById('skin').setAttribute('aria-pressed', String(on))
+    document.getElementById('title').textContent = on ? 'CMD' : 'Chat dos amigos'
+  }
+
+  // --- O que você digita ----------------------------------------------------
+
+  function submit(raw) {
+    const text = raw.trim()
+    if (text.length < 2) return
+    const [command, ...rest] = text.split(' ')
+    const argument = rest.join(' ')
+    if (command === 'cls') return effects.cls()
+    if (command === '--n' && argument) {
+      me.name = argument
+      return system(`Agora você é ${argument}.`)
+    }
+    if (['fundo', 'som', 'tremer', 'oloco'].includes(command)) return prank(me, command, argument)
+    say(me, text)
+    later(() => say(pick(friends), pick(REPLIES)), 900 + Math.random() * 1200)
+  }
+
+  const REPLIES = ['kkkkkkk', 'para de mexer no meu fundo', 'quem fez isso?', 'vou commitar um filtro', 'já voltou a funcionar, pode testar', 'f5 em todo mundo', 'calma que eu arrumo', 'isso era pra ser um chat']
+
+  document.getElementById('form').addEventListener('submit', (event) => {
+    event.preventDefault()
+    submit(input.value)
+    input.value = ''
+  })
+  document.querySelectorAll('[data-effect]').forEach((button) => {
+    button.addEventListener('click', () => prank(me, button.dataset.effect, input.value.trim()))
+  })
+  document.getElementById('undo').addEventListener('click', undoAll)
+  document.getElementById('skin').addEventListener('click', () => setTerminal(!document.body.classList.contains('terminal')))
+  document.getElementById('sound').addEventListener('click', (event) => {
+    soundOn = !soundOn
+    event.currentTarget.setAttribute('aria-pressed', String(soundOn))
+    if (soundOn) beep()
+  })
+
+  // --- Reviver 2016: a história dos commits, encenada -------------------------
+
+  const [rafa, gio, quarto] = friends
+  const STORY = [
+    ['18/04 13:09', 'Nasce o chat: uma caixa de texto, o Firebase e nomes sorteados de duas listas.', () => {
+      effects.cls()
+      say(me, 'funcionou?')
+      later(() => say(rafa, 'funcionou kkkk olha meu nome'), 700)
+      later(() => say(gio, 'quero mudar o meu'), 1400)
+    }],
+    ['18/04 13:42', 'Primeiro pull request de um colega: cada pessoa ganha uma cor. Vem com um erro, corrigido três minutos depois.', () => {
+      say(rafa, 'mandei as cor')
+      later(() => say(quarto, 'quebrou'), 800)
+      later(() => say(rafa, 'arruma'), 1500)
+    }],
+    ['18/04 14:12', 'Para mostrar imagens, a mensagem passa a ser inserida como HTML. É a porta que muda o rumo da tarde.', () => {
+      say(gio, 'olha esse gif', badge('picture', 'gato.gif'))
+    }],
+    ['18/04 15:07', 'O comando de script, que rodava só em quem digitava, passa a ser enviado a todos. O chat vira um controle remoto da tela dos outros.', () => {
+      say(rafa, 'testa aí')
+      later(() => prank(rafa, 'fundo'), 700)
+      later(() => say(me, 'QUEM MEXEU NO MEU FUNDO'), 1600)
+    }],
+    ['18/04 15:47', 'Primeiro filtro de palavras. A condição sai invertida e, por dez minutos, ele faz o contrário do que devia.', () => {
+      say(me, 'pronto, bloqueei')
+      later(() => prank(gio, 'tremer'), 800)
+      later(() => say(gio, 'bloqueou nada'), 1700)
+    }],
+    ['18/04 17:02', 'Chega o player de áudio: basta colar o endereço de um mp3.', () => {
+      say(quarto, 'aumenta o som', badge('player', '▶ musica.mp3'))
+      later(() => prank(quarto, 'som'), 600)
+    }],
+    ['19/04 14:06', 'Um commit faz todo mundo aparecer com o mesmo nome. Quarenta e seis minutos depois sai, e o nome entra na lista de palavras bloqueadas.', () => {
+      effects.rename('Todo Mundo Igual')
+      say(rafa, 'oi')
+      later(() => say(gio, 'oi'), 500)
+      later(() => say(me, 'muito engraçado'), 1100)
+    }],
+    ['19/04 15:53', 'Nasce o "oloco": um comando que apaga a tela dos outros e deixa um texto quicando, escrito de um jeito que escapa do filtro do próprio grupo.', () => {
+      everyone.forEach((person, index) => {
+        person.name = realNames[index]
+      })
+      prank(rafa, 'oloco', 'ÔLOCO, MEU!')
+    }],
+    ['20/04 13:51', 'O botão "-*" apaga o banco inteiro e manda todos recarregarem a página.', () => {
+      effects.cls()
+      system('system: recarregando…')
+    }],
+    ['20/04 16:36', 'Notificações do sistema. Quem recusa a permissão recebe um alerta e tem o nome trocado para "Sou Feio".', () => {
+      me.name = 'Sou Feio'
+      say(gio, 'aceita a notificação')
+      later(() => say(me, 'não'), 700)
+      later(() => say(me, '…'), 1500)
+    }],
+    ['11/08 15:50', 'Quatro meses depois, tudo é reescrito como um terminal verde. Todos viram "Anonymous" e o texto aparece letra por letra.', () => {
+      me.name = realNames[0]
+      setTerminal(true)
+      effects.cls()
+      addLine((line) => typewrite(line, 'TERMINAL - WE ARE ANONYMOUS', 60), 'title')
+      later(() => say(rafa, 'agora sim parece coisa séria'), 2200)
+    }],
+    ['12/12 18:40', 'Último dia: os scripts voltam com "--s", e quem tem o login de administrador fica protegido por um filtro.', () => {
+      say(gio, '--s (uma pegadinha qualquer)')
+      later(() => system('Anonymous - Salvo de código maligno!'), 1500)
+    }],
+  ]
+
+  let storyIndex = -1
+  function playStory() {
+    undoAll()
+    storyIndex = -1
+    nextScene()
+  }
+  function nextScene() {
+    storyIndex++
+    if (storyIndex >= STORY.length) {
+      later(() => {
+        caption.textContent = 'Fim. A sala é sua: escreva, ou pregue uma peça.'
+      }, 500)
+      return
+    }
+    const [when, text, run] = STORY[storyIndex]
+    caption.replaceChildren(Object.assign(document.createElement('time'), { textContent: when }), text)
+    run()
+    later(nextScene, 5200)
+  }
+  document.getElementById('replay').addEventListener('click', playStory)
+
+  // --- Abertura -------------------------------------------------------------
+
+  system(`Você entrou como ${me.name}.`)
+  later(() => say(rafa, 'opa'), 600)
+  later(() => say(gio, 'alguém mexe no fundo de alguém aí'), 1500)
+  if (new URLSearchParams(location.search).has('replay')) later(playStory, 1200)
+})()
+</script>
+</body>
+</html>

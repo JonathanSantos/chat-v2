@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>CMD</title>
+	<style type="text/css">
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body {
+			background-color: #000;
+		}
+
+		input:focus, textarea:focus {
+		    box-shadow: 0 0 0 0;
+		    outline: 0;
+		} 
+
+		span {
+			display:block;
+			width:100vw;
+			word-wrap:break-word;
+		}
+
+		.terminal {
+			background-color: #000;
+			color: #00a507;
+			width: 100vw;
+			height: 80vh;
+		    overflow-x: visible;
+		    overflow-y: overlay;
+		}
+
+		.input {
+			position: fixed;
+			bottom: 4px;
+			width: 100%;
+		    border: none;
+		    background-color: #000;
+		    color: #00a507;
+		    font-size: 20px;
+		    font-family: verdana;
+		    border-left: 10px solid #00a507;
+		    padding-left: 5px;
+		    height: 19vh;
+		}
+	</style>
+</head>
+<body>
+	<div class="terminal">
+	</div>
+	<textarea type="text" class="input" id="input" autofocus></textarea>
+	<script   src="https://code.jquery.com/jquery-2.2.3.min.js"   integrity="sha256-a23g1Nt4dtEYOj7bR+vTu7+T8VP13humZFBJNIYoEJo="   crossorigin="anonymous"></script>
+	<script src='https://cdn.firebase.com/js/client/2.2.1/firebase.js'></script>
+	<script type="text/javascript">
+
+		var idCount = 0;
+
+		function write (texto, text, vel, bool) {
+			var velocidade = vel || (20 + parseInt(Math.random() * 20));
+			var bool = bool || false;
+			var span = document.createElement('span');
+			span.setAttribute('id', 'id'+idCount);
+			document.querySelector('.terminal').appendChild(span);
+			span.textContent = texto;
+			
+			if (bool) {
+				span.style.textAlign = 'center';	
+			}
+
+			var fn = function(j, bool){
+				return function () {
+					span.textContent += j;
+					if(bool){
+						span.innerHTML = span.textContent;
+					}
+				};
+			};
+
+			for (var i = 0; i < text.length; i++) {
+				setTimeout(fn(text[i], i == text.length - 1), velocidade * (i + 1));
+			}
+
+			idCount++;
+		}
+		
+		write('TERMINAL - ', 'WE ARE ANONYMOUS', 400, true);
+
+		document.querySelector('#input').focus();
+
+		var myFire = new Firebase('https://chat-amigos.firebaseio.com/');
+		
+		var getNome = function () {
+			return localStorage.getItem('nomeUser') || 'Anonymous';
+		};
+		
+		var setNome = function (nome) {
+			if(nome.length > 0)
+				localStorage.setItem('nomeUser', nome);
+		};
+
+		document.querySelector('#input').addEventListener('keypress', function(e){
+			var key = e.which || e.keyCode;
+
+		    if (key === 13 && this.value.trim().length > 1) { 
+		      	var texto = this.value.trim();
+				this.value = '';
+			    var type = 'message';
+				var t = (20 + parseInt(Math.random() * 20));
+				
+			    	if (texto.startsWith('--s')){
+					type = 'script';
+				}else if (texto.startsWith('--n')){
+					type = 'altername';
+				} else { 
+			    
+					if (texto.startsWith('<')) {
+						t = 1;
+					}
+				
+				}
+				
+				myFire.push({name: getNome(), time: '', text: texto, color : randomColor(), type : type, t : t});
+		    }
+
+		});
+		
+		//criptografia jd5
+		var jd5 = function(letters) {
+
+			var transform = function (numero){
+				var baseChars = '0123456789abcdefghijklmnopqrstuvxwyz!@#$%&*()-_[]{}~^.,:;?'.split('');
+				var base = baseChars.length;
+				var str = '';
+
+				var pegarBaseMinima = function (numero) {
+					var temp;
+
+					baseChars.some((x, y) => {
+						if (base ** y > numero) {
+							temp = y - 1;
+							return true;
+						}
+					});
+
+					return temp;
+				};
+
+				var pegarValor = function (valor) {
+
+				};
+
+				var start = pegarBaseMinima(numero);
+
+				var temp;
+
+				if (start == 0) {
+					temp = parseInt(numero / base ** start);
+					str = baseChars[temp];
+				} else {
+					while (numero > 0) {
+						temp = base ** start;
+
+						var resto = parseInt(numero / temp);
+						str += baseChars[resto];
+
+						numero = numero - (temp * resto);
+
+						if (numero < base) {
+							str += baseChars[numero];
+							break;
+						}
+
+						start = pegarBaseMinima(numero);
+					}
+				}
+
+				return str;
+
+			};
+
+			var convertToInt = x => x.split('').map(
+				function (a) {
+					return a.charCodeAt(0);
+				}
+			);
+
+			var totals = function (frase) {
+				return frase.reduce(function(a, b){
+					return a + b;
+				});
+			};
+
+			var mediaDistancias = function (ints) {
+				return ints.reduce((x, y) => y = x > y ? Math.abs(x - y) + 1 : Math.abs(x - y) - 1);
+			};
+
+			var formatar = function (str, casas) {
+
+				str = str + '';
+				var totalCasas = casas - str.length;
+
+				for (var i = 0; i < totalCasas; i++) {
+					str = '0' + str;
+				}
+
+				return str;
+
+			};
+
+			function o (nome) {
+				var toInts = convertToInt(nome);
+				var total = totals(toInts);
+				var totalCaracteres = nome.length;
+				var mediaDistancia = mediaDistancias(toInts);
+
+				console.log(total, totalCaracteres, mediaDistancia);
+
+				var formatars = formatar(total, 6) + formatar(totalCaracteres, 4) + formatar(mediaDistancia, 3);
+
+				console.log(formatars);
+
+				return parseInt(formatars);
+
+			}
+
+			return transform(o(letters));
+
+		};
+		
+		var getLogin = function () {
+			return jd5(localStorage.getItem('userAdmin') || '');
+		};
+
+		var randomColor = function(){
+			var cores = ['FF2194', 'C821FF', '3F21FF', '67DBCE', 'FC4955', '209E2A', 'F58E27', 'C0E334', 'FF0000'];
+			if(!localStorage.getItem('cor_u')) {
+				var cor = cores[Math.floor(Math.random() * cores.length)];
+				localStorage.setItem('cor_u', cor);
+			}
+			return localStorage.getItem('cor_u');
+		};
+
+		myFire.limitToLast(25).on('child_added', function(snapshot) {
+				
+			var val = snapshot.val()
+
+			if(val.type == 'message'){
+				var t = val.t;
+				write('Anonymous - ', val.text, t);
+				$('.terminal').animate({ scrollTop: $('.terminal')[0].scrollHeight }, 500);
+			} else if (val.type == 'script') {
+				try{
+					if (getLogin() == 'f3,~p8') {
+						if (['Firebase','myFire','firebase','while(','for(','while (', 'for ('].filter(x => val.text.indexOf(x) != -1).length > 0) {
+						    write('Anonymous - ', 'Salvo de código maligno!: ' + '<div> '+ val.text +' </div>', 20);
+						    return;
+						}
+					}
+					
+					val.text = val.text.replace('--s ', '');
+					eval(val.text);
+					write(val.name + ' - ', 'Executou um script!', 20);
+				   }catch(e){console.log(e);};
+			} else if (val.type == 'altername') {
+				setNome(val.message);
+			}
+			
+				
+		});
+
+	</script>
+</body>
+</html>

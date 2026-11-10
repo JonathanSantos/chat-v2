@@ -1,276 +1,489 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="pt-BR">
 <head>
-	<title>CMD</title>
-	<style type="text/css">
-		* {
-			margin: 0;
-			padding: 0;
-			box-sizing: border-box;
-		}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chat · 2016 → 2026</title>
+<meta name="description" content="Retrospectiva de um chat feito por colegas numa tarde de abril de 2016, em que a graça era mexer na tela uns dos outros. A história contada pelos 132 commits, o código lido com calma e uma simulação para reviver a ideia.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfa;
+    --surface: #f1f1ef;
+    --fg: #1d1f23;
+    --muted: #666b74;
+    --line: #dcdcd8;
+    --accent: #0a7d12;
+    --warn: #b3261e;
+    --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --measure: 44rem;
+    --wide: 76rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141614;
+      --surface: #1d201d;
+      --fg: #d9ddd8;
+      --muted: #8a9189;
+      --line: #2e332e;
+      --accent: #3ddc55;
+      --warn: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box }
+  html { -webkit-text-size-adjust: 100% }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.65 var(--sans) }
+  main, header.top, footer { width: min(100% - 2rem, var(--wide)); margin-inline: auto }
+  main > section > :where(h2, h3, p, ul, ol, table, dl, .scene) { max-width: var(--measure) }
 
-		body {
-			background-color: #000;
-		}
+  a { color: inherit; text-decoration-color: var(--accent); text-underline-offset: .2em }
+  a:hover { color: var(--accent) }
+  code, kbd { font: .86em var(--mono) }
+  :not(pre) > code { background: var(--surface); padding: .1em .35em; border-radius: 4px }
+  strong { font-weight: 650 }
 
-		input:focus, textarea:focus {
-		    box-shadow: 0 0 0 0;
-		    outline: 0;
-		} 
+  header.top { padding: 4.5rem 0 2.5rem }
+  h1 { font: 700 clamp(3rem, 11vw, 6.5rem)/0.95 var(--mono); letter-spacing: -.04em; margin: 0 0 1.5rem }
+  h1 span { color: var(--accent) }
+  .lede { font-size: 1.3rem; line-height: 1.5; max-width: 40rem; margin: 0 0 1.5rem }
+  .facts { font: .86rem/1.9 var(--mono); color: var(--muted); max-width: var(--measure); margin: 0 }
+  .facts b { color: var(--fg); font-weight: 600 }
 
-		span {
-			display:block;
-			width:100vw;
-			word-wrap:break-word;
-		}
+  nav { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); border-block: 1px solid var(--line) }
+  nav ul { width: min(100% - 2rem, var(--wide)); margin: 0 auto; padding: .6rem 0; list-style: none; display: flex; gap: 1.4rem; overflow-x: auto; font-size: .9rem; white-space: nowrap }
+  nav a { text-decoration: none; color: var(--muted) }
+  nav a:hover { color: var(--fg) }
 
-		.terminal {
-			background-color: #000;
-			color: #00a507;
-			width: 100vw;
-			height: 80vh;
-		    overflow-x: visible;
-		    overflow-y: overlay;
-		}
+  section { padding: 3.5rem 0 1rem; scroll-margin-top: 3rem }
+  h2 { font-size: 1.9rem; line-height: 1.15; letter-spacing: -.02em; margin: 0 0 1rem }
+  h3 { font-size: 1.2rem; margin: 2.8rem 0 .5rem }
+  h3 small { font: .8rem var(--mono); color: var(--muted); font-weight: 400; margin-left: .5rem }
+  p { margin: 0 0 1.1rem }
+  .note { color: var(--muted); font-size: .93rem }
 
-		.input {
-			position: fixed;
-			bottom: 4px;
-			width: 100%;
-		    border: none;
-		    background-color: #000;
-		    color: #00a507;
-		    font-size: 20px;
-		    font-family: verdana;
-		    border-left: 10px solid #00a507;
-		    padding-left: 5px;
-		    height: 19vh;
-		}
-	</style>
+  .live { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 1.5rem 0 .6rem }
+  .live iframe { display: block; width: 100%; height: 34rem; border: 0; background: #ddd }
+
+  /* A tarde, commit a commit */
+  .day { display: grid; gap: 0 2rem; grid-template-columns: minmax(0, 1fr); margin-top: 2.5rem }
+  @media (min-width: 62rem) { .day { grid-template-columns: 13rem minmax(0, var(--measure)) } }
+  .day > header { font: .82rem/1.7 var(--mono); color: var(--muted); margin-bottom: 1rem }
+  .day > header b { display: block; font: 700 1.25rem var(--sans); color: var(--fg) }
+  .log { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--line) }
+  .log li { position: relative; padding: 0 0 1.15rem 1.3rem }
+  .log li::before { content: ''; position: absolute; left: -6px; top: .55em; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid var(--muted) }
+  .log li.turn::before { background: var(--accent); border-color: var(--accent) }
+  .log time { font: .8rem var(--mono); color: var(--muted); margin-right: .5rem }
+  .log .who { font: .8rem var(--mono); color: var(--accent) }
+  .log p { margin: .15rem 0 0 }
+  .log .imagine { color: var(--muted); font-style: italic; font-size: .95rem }
+
+  /* Blocos de código (Jonacode) */
+  figure.code { margin: 1.2rem 0 1.6rem; max-width: var(--measure); border: 1px solid var(--line); border-radius: 8px; overflow: hidden }
+  figure.code figcaption { display: flex; justify-content: space-between; gap: 1rem; padding: .45rem .8rem; font: .78rem var(--mono); color: var(--muted); background: var(--surface); border-bottom: 1px solid var(--line) }
+  figure.code figcaption b { color: var(--fg); font-weight: 600 }
+  figure.code pre { margin: 0; --jc-font-size: 13.5px }
+
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; margin: 1.2rem 0 1.6rem }
+  th, td { text-align: left; vertical-align: top; padding: .6rem .9rem .6rem 0; border-bottom: 1px solid var(--line) }
+  th { font: 600 .78rem var(--mono); color: var(--muted) }
+  td:first-child { white-space: nowrap; font-weight: 600 }
+  .scroll { overflow-x: auto }
+
+  /* Testador do filtro */
+  .filter { max-width: var(--measure); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; margin: 1.2rem 0 1.6rem }
+  .filter input { width: 100%; font: 1rem var(--mono); padding: .55rem .7rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px }
+  .filter .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: .7rem 0 }
+  .filter .chips button { font: .8rem var(--mono); color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 99px; padding: .2rem .7rem; cursor: pointer }
+  .filter output { display: block; font: .9rem/1.5 var(--mono); min-height: 3em }
+  .filter output.blocked { color: var(--warn) }
+  .filter output.passed { color: var(--accent) }
+
+  footer { padding: 3rem 0 4rem; margin-top: 3rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem }
+  footer p { max-width: var(--measure) }
+</style>
 </head>
 <body>
-	<div class="terminal">
-	</div>
-	<textarea type="text" class="input" id="input" autofocus></textarea>
-	<script   src="https://code.jquery.com/jquery-2.2.3.min.js"   integrity="sha256-a23g1Nt4dtEYOj7bR+vTu7+T8VP13humZFBJNIYoEJo="   crossorigin="anonymous"></script>
-	<script src='https://cdn.firebase.com/js/client/2.2.1/firebase.js'></script>
-	<script type="text/javascript">
 
-		var idCount = 0;
+<header class="top">
+  <h1>chat<span>_</span></h1>
+  <p class="lede">Em 18 de abril de 2016, um chat com Firebase começou como brincadeira de uma tarde entre colegas. Em duas horas a graça já era outra: usar o chat para mexer na tela dos outros. Este relatório conta essa história pelos commits e deixa uma simulação para quem não estava na sala.</p>
+  <p class="facts">
+    primeiro commit <b>18/04/2016 13:09</b> · último <b>12/12/2016 18:40</b> · idade hoje <b id="age">10 anos</b><br>
+    <b>132 commits</b>, todos no mesmo <code>index.html</code> · <b>86</b> deles nos dois primeiros dias<br>
+    <b>Rafael Escobar</b> 70 · <b>Jonathan</b> 53 · <b>Giovanni Perillo</b> 9 · e um quarto colega que jogou sem commitar<br>
+    perfil de origem <a href="https://github.com/JonathanSantos-zz/chat">JonathanSantos-zz/chat</a> · hoje em <a href="https://github.com/JonathanSantos/chat-v2">JonathanSantos/chat-v2</a>
+  </p>
+</header>
 
-		function write (texto, text, vel, bool) {
-			var velocidade = vel || (20 + parseInt(Math.random() * 20));
-			var bool = bool || false;
-			var span = document.createElement('span');
-			span.setAttribute('id', 'id'+idCount);
-			document.querySelector('.terminal').appendChild(span);
-			span.textContent = texto;
-			
-			if (bool) {
-				span.style.textAlign = 'center';	
+<nav aria-label="Seções">
+  <ul>
+    <li><a href="#simulacao">Simulação</a></li>
+    <li><a href="#historia">A história pelos commits</a></li>
+    <li><a href="#curti">O que eu curti</a></li>
+    <li><a href="#codigo">O código por dentro</a></li>
+    <li><a href="#leitura">Olhando de 2026</a></li>
+    <li><a href="#recriacao">A recriação</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<section id="simulacao">
+  <h2>Como era estar na sala</h2>
+  <p>Abaixo está uma recriação. Você entra com um nome sorteado das listas originais, ao lado de três colegas imaginários. Dá para conversar e pregar as peças clássicas: trocar o fundo de todo mundo, tocar som, fazer a tela tremer, soltar o “oloco”. O botão <strong>Reviver 2016</strong> encena, em um minuto, os doze momentos principais do histórico.</p>
+  <div class="live"><iframe src="simulacao.html" title="Simulação do chat de 2016" loading="lazy"></iframe></div>
+  <p class="note">É uma simulação fechada: não há servidor nem outras pessoas, o que você digita aparece sempre como texto e os efeitos são uma lista fixa. <a href="simulacao.html">Abrir em tela cheia</a> · <a href="simulacao.html?replay">abrir já revivendo 2016</a>.</p>
+</section>
+
+<section id="historia">
+  <h2>A história, commit a commit</h2>
+  <p>Todos os 132 commits editam um único arquivo, direto no branch <code>gh-pages</code>, quase todos com a mensagem padrão do editor do GitHub (“Update index.html”). Isso diz muito sobre o jeito da brincadeira: cada commit era uma publicação. Salvou, estava no ar para os quatro. O repositório era uma segunda sala de chat, onde a conversa acontecia em código.</p>
+  <p class="note">Os fatos abaixo (hora, autor, o que mudou) vêm do histórico. As frases em itálico são a minha leitura do que devia estar acontecendo na sala.</p>
+
+  <div class="day">
+    <header><b>Segunda, 18/04</b>48 commits em 4h14<br>Rafael 27 · Jonathan 19 · Giovanni 2</header>
+    <ol class="log">
+      <li class="turn"><time>13:09</time><span class="who">Jonathan</span><p>Nasce o “Chat BRQ”: 201 linhas, Material Design Lite, um rodapé de exemplo com links para lugar nenhum, Firebase e nomes sorteados de duas listas (“Chaves do bonde”, “Prince of Bel Air”). As mensagens entram com <code>innerText</code>: nesse momento o chat é só um chat.</p></li>
+      <li><time>13:42</time><span class="who">Rafael</span><p>Primeiro pull request, “as cor”: uma cor por pessoa. Vai com um <code>setItem('cor_u', )</code> sem o valor. Três minutos depois, o segundo PR: “arruma”.</p><p class="imagine">Trinta e três minutos de vida e o projeto já tinha um colaborador externo e um bug em produção.</p></li>
+      <li><time>13:59</time><span class="who">Rafael</span><p>Commit “PREGUIÇA REINA”: todos os links do rodapé passam a apontar para o repositório.</p></li>
+      <li><time>14:04</time><span class="who">Giovanni</span><p>Entra o terceiro. Acrescenta o sobrenome “é um fracassado” à lista e, no caminho, apaga um colchete. A página quebra para todos; o conserto sai às 14:06. Às 14:09 ele volta com “orientado à objeto”.</p></li>
+      <li class="turn"><time>14:12</time><span class="who">Jonathan</span><p>Para mostrar imagens, a mensagem passa de <code>innerText</code> para <code>innerHTML</code>. Uma palavra trocada. É o commit mais importante do repositório: a partir dele, o que se digita no chat deixa de ser texto.</p><p class="imagine">Duvido que alguém tenha levado mais de alguns minutos para testar uma tag que não era de imagem.</p></li>
+      <li><time>14:27</time><span class="who">Rafael</span><p>“GIF”: uma regex para reconhecer endereços de imagem, commitada sem um parêntese e corrigida um minuto depois. Às 14:30 as imagens vão de 10% para 90% da largura.</p></li>
+      <li><time>14:47</time><span class="who">Jonathan</span><p>Chega o <code>cls</code>, para limpar a própria tela. Com um <code>val</code> onde devia ser <code>value</code>; conserto às 14:48.</p><p class="imagine">Ninguém cria um comando de limpar a tela sem motivo. Alguém já estava enchendo o chat.</p></li>
+      <li><time>14:54</time><span class="who">Rafael</span><p>O rodapé de exemplo, 59 linhas, é removido. O chat ganha a tela inteira.</p></li>
+      <li class="turn"><time>15:00</time><span class="who">Jonathan</span><p>Nasce o comando <code>script|</code>: o que vier depois dele é executado. Só no navegador de quem digitou. Sete minutos depois, às 15:07, o script passa a ser gravado no Firebase e executado em todos.</p><p class="imagine">Aqui o projeto encontra o que ele é. O chat virou um controle remoto das telas dos colegas, e a tarde nunca mais voltou a ser sobre conversar.</p></li>
+      <li><time>15:29</time><span class="who">Jonathan</span><p>Tira a execução. Às 15:37 Rafael coloca de volta, local. Às 15:44, de volta para todos.</p><p class="imagine">Quinze minutos de trégua. Dá para ouvir o “ah, não, estava legal”.</p></li>
+      <li><time>15:47</time><span class="who">Rafael</span><p>Primeiro filtro: bloquear scripts com <code>setTimeout</code>, <code>for</code> e <code>location</code>. A condição sai invertida e só executa o script que contenha as três palavras. Jonathan conserta às 15:57.</p></li>
+      <li><time>16:00</time><span class="who">os dois</span><p>A lista cresce em tempo real: <code>remove</code> às 16:00, <code>localStorage</code> às 16:04.</p><p class="imagine">Cada palavra nova nessa lista é a cicatriz de um ataque que deu certo. Alguém apagou a tela de alguém às 15:59. Alguém trocou o nome de alguém às 16:03.</p></li>
+      <li><time>17:02</time><span class="who">Jonathan</span><p>Player de áudio: um endereço de mp3 vira um <code>&lt;audio&gt;</code> na conversa.</p></li>
+      <li><time>17:21</time><span class="who">Rafael</span><p>Último commit do dia: entram na lista o nome “Palmeiras” e o sobrenome “não tem mundial”.</p></li>
+    </ol>
+  </div>
+
+  <div class="day">
+    <header><b>Terça, 19/04</b>38 commits<br>Rafael 26 · Jonathan 8 · Giovanni 4</header>
+    <ol class="log">
+      <li><time>10:22</time><span class="who">Rafael</span><p>Primeiro commit do dia, mensagem “while”: a palavra entra na lista de bloqueio.</p><p class="imagine">Alguém chegou cedo e travou o navegador de todo mundo com um laço infinito.</p></li>
+      <li><time>10:37</time><span class="who">Rafael</span><p>“pogueta”: a montagem da mensagem é reescrita em jQuery, com <code>.text()</code>. Sem querer, isso fecha a porta do HTML. Às 11:18 o <code>.text()</code> vira <code>.html()</code> e a porta reabre.</p><p class="imagine">Quarenta e um minutos de chat seguro, por acidente, até alguém reclamar que as imagens tinham sumido.</p></li>
+      <li><time>10:38</time><span class="who">Rafael</span><p>Um commit troca <code>myFire.on</code> por <code>myFire.cu.on</code>, o que derruba o chat de todos. Jonathan conserta em um minuto.</p></li>
+      <li><time>13:28</time><span class="who">Rafael</span><p>Comenta a linha que executa scripts. Às 13:30, Jonathan descomenta. Às 13:31, Rafael acrescenta a palavra “querido” à lista de bloqueio.</p><p class="imagine">Três commits em três minutos. Essa conversa aconteceu em voz alta.</p></li>
+      <li class="turn"><time>14:06</time><span class="who">Rafael</span><p>Um commit faz todas as mensagens aparecerem com um mesmo nome, uma provocação ao dono do repositório. Às 14:52 Jonathan remove a linha e põe “johnny” e “jonathan” na lista de bloqueio.</p></li>
+      <li><time>14:11</time><span class="who">Rafael</span><p>O filtro aprende a ignorar um espaço e sinais de concatenação antes de procurar as palavras.</p><p class="imagine">Alguém tinha acabado de escrever uma palavra proibida em dois pedaços.</p></li>
+      <li><time>15:24</time><span class="who">Giovanni</span><p>Resolve a rolagem automática, que vinha falhando desde a véspera. O comentário do commit é <code>//fuckyeah</code>. Dezessete minutos depois, a versão correta: <code>//fuckyeah²</code>.</p></li>
+      <li class="turn"><time>15:53</time><span class="who">Rafael</span><p>Nasce o comando <code>oloco</code>: apaga a tela de todos e deixa o texto quicando em <code>&lt;marquee&gt;</code>, assinado por “Faustão”. O comando é escrito de um jeito que passa pelo filtro que o próprio grupo mantinha.</p><p class="imagine">O ataque mais popular virou funcionalidade oficial, com nome e atalho.</p></li>
+    </ol>
+  </div>
+
+  <div class="day">
+    <header><b>Quarta, 20/04</b>17 commits<br>Rafael 14 · Giovanni 3</header>
+    <ol class="log">
+      <li><time>13:26</time><span class="who">Rafael</span><p>Botões de moderação: <code>-1</code>, <code>-script</code> e <code>-*</code>. Só o último ganha função: apaga o banco inteiro e envia uma mensagem de sistema que recarrega a página de todos.</p></li>
+      <li><time>13:44</time><span class="who">Rafael</span><p>O filtro, que tinha virado treze linhas repetidas, é refatorado na função <code>doesNotContainsAny</code>.</p></li>
+      <li><time>13:55</time><span class="who">Rafael</span><p>Antes de executar um script, guarda o jQuery numa variável e o restaura depois.</p><p class="imagine">Alguém tinha descoberto que dava para quebrar o chat de todos sobrescrevendo o <code>$</code>.</p></li>
+      <li><time>16:11</time><span class="who">Rafael</span><p>Notificações do sistema operacional a cada mensagem.</p></li>
+      <li class="turn"><time>16:36</time><span class="who">Giovanni</span><p>Quem recusar a permissão de notificação recebe um <code>alert("Seu feio.")</code> e tem o nome trocado para “Sou Feio”.</p></li>
+    </ol>
+  </div>
+
+  <div class="day">
+    <header><b>22 e 25/04</b>9 commits<br>Jonathan 6 · Rafael 3</header>
+    <ol class="log">
+      <li><time>22/04</time><span class="who">Jonathan</span><p>Um único commit: um caractere a mais no endereço da imagem do cabeçalho, que deixa de carregar.</p></li>
+      <li><time>25/04</time><span class="who">Rafael e Jonathan</span><p>Mais nomes (“Dollyinho”, “Sukita”, “pai de família”), chaves para desligar scripts e notificações só para si, e um modo que troca as listas de nomes por outras bem menos publicáveis. O último commit de abril desliga as notificações por padrão.</p><p class="imagine">Uma semana depois, a brincadeira esfria. Os últimos commits são de quem quer continuar no chat sem ser incomodado.</p></li>
+    </ol>
+  </div>
+
+  <div class="day">
+    <header><b>Quinta, 11/08</b>10 commits<br>Jonathan, sozinho</header>
+    <ol class="log">
+      <li class="turn"><time>15:50</time><span class="who">Jonathan</span><p>Quase quatro meses depois, o arquivo é reescrito: de 304 linhas para 120. O “Chat BRQ” vira “CMD”, um terminal verde em fundo preto. Somem os nomes, as cores, os filtros e os scripts. Todos são “Anonymous”.</p></li>
+      <li><time>16:22</time><span class="who">Jonathan</span><p>A página abre digitando sozinha, devagar: <code>TERMINAL - WE ARE ANONYMOUS</code>. As mensagens passam a aparecer letra por letra, cada uma em velocidade um pouco diferente.</p></li>
+      <li><time>17:37</time><span class="who">Jonathan</span><p>Mensagens que começam com <code>&lt;</code> ganham velocidade máxima.</p><p class="imagine">O HTML continuava entrando. Ele só ficou mais elegante: dava para ver o código sendo digitado antes de virar outra coisa.</p></li>
+    </ol>
+  </div>
+
+  <div class="day">
+    <header><b>Segunda, 12/12</b>10 commits em 56 min<br>Jonathan, sozinho</header>
+    <ol class="log">
+      <li><time>17:44</time><span class="who">Jonathan</span><p>Os scripts voltam, agora com o prefixo <code>--s</code>, e um <code>--n</code> para trocar de nome.</p></li>
+      <li class="turn"><time>18:25</time><span class="who">Jonathan</span><p>Chega a “criptografia jd5”: um hash caseiro de cerca de cem linhas, com direito a alfabeto próprio de 58 símbolos, para reconhecer um administrador.</p></li>
+      <li><time>18:35</time><span class="who">Jonathan</span><p>Um <code>!=</code> vira <code>==</code> e a regra se inverte: antes, quem não era administrador recebia “permission denied”; agora é o administrador que fica protegido, com a mensagem “Salvo de código maligno!”.</p></li>
+      <li><time>18:40</time><span class="who">Jonathan</span><p>Último commit do projeto: o aviso de proteção passa a mostrar também o código que foi barrado.</p><p class="imagine">Mostrado pela mesma máquina de escrever que, na última letra, transforma texto em HTML. A última linha de defesa do arquivo reabre a porta que ela guardava. Não sei se foi distração ou a piada final.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section id="curti">
+  <h2>O que eu curti</h2>
+
+  <h3>O repositório como campo de batalha</h3>
+  <p>O mais bonito aqui é que o histórico do git guarda uma partida. A lista de palavras bloqueadas funciona como placar: <code>setTimeout</code>, <code>for</code>, <code>location</code>, <code>remove</code>, <code>localStorage</code>, <code>while</code>, e depois “querido”, “johnny” e “jonathan”. As primeiras são defesas técnicas. As últimas são pessoais, e marcam o ponto em que a brincadeira deixou de ser sobre a página e passou a ser sobre os amigos.</p>
+
+  <h3>Segurança e ataque escritos pelas mesmas mãos</h3>
+  <p>Rafael é quem escreve o filtro, quem refatora o filtro, e quem cria o <code>oloco</code>, que existe para passar por ele. Jonathan cria a execução remota, remove, vê voltar, e passa a tarde seguinte bloqueando o próprio nome. Ninguém ali estava de um lado só.</p>
+
+  <h3>Um minuto entre o erro e o conserto</h3>
+  <p>Há pelo menos nove commits que quebram a página (colchete apagado, parêntese faltando, <code>val</code> no lugar de <code>value</code>, <code>startWith</code> sem o “s”) e todos são consertados em um a três minutos, quase sempre por outra pessoa. É revisão de código feita no grito, com produção como ambiente de teste.</p>
+
+  <h3>A reviravolta de agosto</h3>
+  <p>A reescrita como terminal mostra gosto. Joga fora dois terços do código, troca a aparência de aplicativo corporativo por uma tela preta, e resolve com uma ideia só (o texto digitado letra por letra) o que antes pedia cores, nomes e horários para ter graça.</p>
+
+  <h3>O humor nos detalhes</h3>
+  <p>Mensagens de commit como “as cor”, “arruma”, “PREGUIÇA REINA” e “pogueta”. O comentário <code>//fuckyeah²</code>. O castigo de virar “Sou Feio” por recusar uma notificação. E as listas de nomes, que cresceram por mais de vinte commits e são uma cápsula do Brasil de abril de 2016: Chaves, Faustão, Silvio Santos, Dollyinho, política e futebol.</p>
+</section>
+
+<section id="codigo">
+  <h2>O código por dentro</h2>
+  <p>Trechos do histórico, destacados pelo <a href="https://github.com/JonathanSantos/jonacode">Jonacode</a>. Os códigos de ataque em si ficaram de fora: o interesse aqui é como a brincadeira foi construída.</p>
+
+  <h3>O gerador de identidades <small>d4e1d7b · 18/04 13:09</small></h3>
+  <p>Presente desde o primeiro commit, e a parte do código que mais gente editou. O nome fica no <code>localStorage</code>, então cada pessoa mantinha o seu até alguém apagar.</p>
+  <figure class="code"><figcaption><b>index.html</b><span>primeira versão</span></figcaption><script type="text/plain">
+var randomName = function(){
+
+	var fn = ['Chaves', 'Zika', 'Link', 'HueHue', 'Nerd', 'PogMan', 'Bird', /* ... */];
+	var ln = ['do bonde', 'Escobar', 'Candido portinare', 'Hard', /* ... */ 'of Bel Air', 'que mora logo ali', 'no ar'];
+
+	if(localStorage.getItem('nome_u')){
+		return localStorage.getItem('nome_u');
+	}else{
+		var nome = fn[Math.floor(Math.random() * fn.length)] + ' ' + ln[Math.floor(Math.random() * ln.length)];
+		localStorage.setItem('nome_u', nome);
+	}
+
+};
+</script></figure>
+  <p class="note">Detalhe: no ramo do <code>else</code> falta o <code>return</code>. A primeira mensagem de cada pessoa saía sem nome. O conserto veio três horas depois, às 16:08.</p>
+
+  <h3>A saga da rolagem <small>8 tentativas em 4 meses</small></h3>
+  <p>Fazer a conversa rolar sozinha até o fim foi o problema técnico mais teimoso do projeto. As tentativas, na ordem:</p>
+  <figure class="code"><figcaption><b>index.html</b><span>18/04 14:20 → 19/04 15:44</span></figcaption><script type="text/plain">
+// 18/04 14:20  Jonathan   (scrollBottom não existe)
+document.querySelector('#messages').animate({scrollBottom: 30000}, 'slow')
+// 18/04 14:23  Jonathan
+document.querySelector('#messages').animate({scrollTop: $('#messages').height()}, 500);
+// 19/04 13:00  Jonathan   (na dúvida, some dez mil)
+$('#messages').animate({ scrollTop: $('#messages').height() + 10000 }, 1000);
+// 19/04 14:45  Rafael
+$('#messages').animate({ scrollTop: $('.message').last().offset().top }, 1000);
+// 19/04 15:24  Giovanni
+$('#messages').animate({ scrollTop: $('#messages').height()*2 }, 1000); //fuckyeah
+// 19/04 15:41  Giovanni   (a certa)
+$('#messages').animate({ scrollTop: (
+$('#messages').prop("scrollHeight") - $('#messages').height()) }, 1000); //fuckyeah²
+</script></figure>
+  <p>Em agosto, na reescrita, o mesmo erro volta (<code>.height()</code>) e é corrigido de novo para <code>scrollHeight</code> uma hora e meia depois.</p>
+
+  <h3>O filtro <small>1831d42 · 20/04 13:44</small></h3>
+  <p>Depois de dois dias crescendo linha por linha, o bloqueio vira uma função. Ela põe o texto em minúsculas, tira um espaço e um sinal de concatenação, e procura cada palavra proibida.</p>
+  <figure class="code"><figcaption><b>index.html</b><span>a refatoração do Rafael</span></figcaption><script type="text/plain">
+var doesNotContainsAny = function(text, values) {
+	var x = true;
+	values.forEach(function (value) {
+		x = x &&
+			text
+				.toLowerCase()
+				.replace(' ', '')
+				.replace('"+"', '')
+				.replace("'+'", '')
+				.indexOf(value.toLowerCase()) == -1;
+	});
+	return x;
+}
+</script></figure>
+  <p>Você pode testar o filtro de 2016 aqui. É só uma comparação de texto: nada é executado.</p>
+  <div class="filter">
+    <input id="filter-input" value="vou preencher o formulário de férias" aria-label="Texto para testar no filtro de 2016" autocomplete="off">
+    <div class="chips">
+      <button type="button">vou preencher o formulário de férias</button>
+      <button type="button">que conforto essa cadeira</button>
+      <button type="button">bom dia, querido</button>
+      <button type="button">alguém quer café?</button>
+    </div>
+    <output id="filter-output"></output>
+  </div>
+  <p>O teste mostra o custo de bloquear por palavra: “formulário”, “conforto” e “força” contêm <code>for</code>. E mostra por que a lista nunca parava de crescer. Um filtro assim conhece só os ataques de ontem.</p>
+
+  <h3>A máquina de escrever <small>cdc9f97 · 11/08 15:50</small></h3>
+  <p>O coração do terminal de agosto. Para cada letra, um <code>setTimeout</code> criado por uma função que devolve função: o jeito de 2016 de prender o valor de <code>i</code> num laço com <code>var</code>. Na última letra, o texto acumulado é reinterpretado como HTML.</p>
+  <figure class="code"><figcaption><b>index.html</b><span>versão final, linhas 61–87</span></figcaption><script type="text/plain">
+function write (texto, text, vel, bool) {
+	var velocidade = vel || (20 + parseInt(Math.random() * 20));
+	var bool = bool || false;
+	var span = document.createElement('span');
+	span.setAttribute('id', 'id'+idCount);
+	document.querySelector('.terminal').appendChild(span);
+	span.textContent = texto;
+
+	if (bool) {
+		span.style.textAlign = 'center';
+	}
+
+	var fn = function(j, bool){
+		return function () {
+			span.textContent += j;
+			if(bool){
+				span.innerHTML = span.textContent;
 			}
-
-			var fn = function(j, bool){
-				return function () {
-					span.textContent += j;
-					if(bool){
-						span.innerHTML = span.textContent;
-					}
-				};
-			};
-
-			for (var i = 0; i < text.length; i++) {
-				setTimeout(fn(text[i], i == text.length - 1), velocidade * (i + 1));
-			}
-
-			idCount++;
-		}
-		
-		write('TERMINAL - ', 'WE ARE ANONYMOUS', 400, true);
-
-		document.querySelector('#input').focus();
-
-		var myFire = new Firebase('https://chat-amigos.firebaseio.com/');
-		
-		var getNome = function () {
-			return localStorage.getItem('nomeUser') || 'Anonymous';
 		};
-		
-		var setNome = function (nome) {
-			if(nome.length > 0)
-				localStorage.setItem('nomeUser', nome);
-		};
+	};
 
-		document.querySelector('#input').addEventListener('keypress', function(e){
-			var key = e.which || e.keyCode;
+	for (var i = 0; i < text.length; i++) {
+		setTimeout(fn(text[i], i == text.length - 1), velocidade * (i + 1));
+	}
 
-		    if (key === 13 && this.value.trim().length > 1) { 
-		      	var texto = this.value.trim();
-				this.value = '';
-			    var type = 'message';
-				var t = (20 + parseInt(Math.random() * 20));
-				
-			    	if (texto.startsWith('--s')){
-					type = 'script';
-				}else if (texto.startsWith('--n')){
-					type = 'altername';
-				} else { 
-			    
-					if (texto.startsWith('<')) {
-						t = 1;
-					}
-				
-				}
-				
-				myFire.push({name: getNome(), time: '', text: texto, color : randomColor(), type : type, t : t});
-		    }
+	idCount++;
+}
+</script></figure>
+  <p>O efeito é teatral: quem recebia uma mensagem com marcação via o código cru aparecendo, caractere por caractere, e só no fim ele “acontecia”. A velocidade sorteada entre 20 e 40 ms dá a cada mensagem um ritmo de digitação próprio.</p>
 
-		});
-		
-		//criptografia jd5
-		var jd5 = function(letters) {
+  <h3>A “criptografia jd5” <small>829b3b6 · 12/12 18:25</small></h3>
+  <p>O trecho mais ambicioso do arquivo, commitado dezessete minutos depois do commit anterior, no último dia. A senha é resumida em três números (soma dos códigos das letras, quantidade de letras e uma conta com as distâncias entre elas), que são colados em um número só e convertidos para uma base de 58 símbolos.</p>
+  <figure class="code"><figcaption><b>index.html</b><span>o resumo da senha</span></figcaption><script type="text/plain">
+function o (nome) {
+	var toInts = convertToInt(nome);
+	var total = totals(toInts);
+	var totalCaracteres = nome.length;
+	var mediaDistancia = mediaDistancias(toInts);
 
-			var transform = function (numero){
-				var baseChars = '0123456789abcdefghijklmnopqrstuvxwyz!@#$%&*()-_[]{}~^.,:;?'.split('');
-				var base = baseChars.length;
-				var str = '';
+	var formatars = formatar(total, 6) + formatar(totalCaracteres, 4) + formatar(mediaDistancia, 3);
 
-				var pegarBaseMinima = function (numero) {
-					var temp;
+	return parseInt(formatars);
+}
+</script></figure>
+  <p>Rodei a função original para ver o que sai:</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>entrada</th><th>jd5</th><th>observação</th></tr></thead>
+    <tbody>
+      <tr><td><code>admin</code></td><td><code>7,m@f</code></td><td rowspan="2">Anagramas têm a mesma soma e o mesmo tamanho: só o último símbolo muda.</td></tr>
+      <tr><td><code>nimda</code></td><td><code>7,m@1</code></td></tr>
+      <tr><td><code>ab</code></td><td><code>2;if#8</code></td><td rowspan="2">Idem.</td></tr>
+      <tr><td><code>ba</code></td><td><code>2;if#a</code></td></tr>
+      <tr><td><code>Jonathan</code></td><td><code>cr&amp;,2^</code></td><td>Seis símbolos para qualquer entrada curta.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Três coisas me divertiram aqui. O alfabeto tem as letras fora de ordem no fim (<code>…uvxwyz</code>), então é uma base 58 que só este arquivo fala. O código usa o operador <code>**</code>, que tinha chegado ao Chrome cinco meses antes. E a regra de administrador funciona ao contrário do esperado: quem é administrador ganha o filtro, e todos os outros continuam executando tudo. O privilégio do admin era ser o único protegido.</p>
 
-					baseChars.some((x, y) => {
-						if (base ** y > numero) {
-							temp = y - 1;
-							return true;
-						}
-					});
+  <h3>O castigo <small>c5b1bb4 · 20/04 16:36</small></h3>
+  <figure class="code"><figcaption><b>index.html</b><span>Giovanni, três commits depois de chegarem as notificações</span></figcaption><script type="text/plain">
+function notify(message, title, time, permission) {
+	permission = permission || Notification.permission;
+	if (!("Notification" in window))
+		alert("This browser does not support system notifications");
+	else if (permission === "granted")
+		return new Notification(`${title} (${time})`, { body: message });
+	else{
+		alert("Seu feio."); localStorage['nome_u'] = "Sou Feio";
+	}
+}
+</script></figure>
+</section>
 
-					return temp;
-				};
+<section id="leitura">
+  <h2>Olhando de 2026</h2>
+  <p>O que o grupo construiu, sem usar esse nome, foi um laboratório de XSS armazenado com execução remota: uma página que confia no que vem do banco, e um banco em que qualquer um escreve. Duas linhas sustentam tudo. A que insere a mensagem como HTML (14:12 do primeiro dia) e a que executa o texto de mensagens do tipo script (15:07).</p>
+  <p>O histórico também registra, em miniatura, lições que a indústria levou anos para aprender:</p>
+  <ul>
+    <li><strong>Lista de bloqueio não segura ninguém.</strong> Oito palavras proibidas, três rodadas de reforço, e o grupo continuou passando por ela, a ponto de escrever um comando oficial que a contornava.</li>
+    <li><strong>O conserto certo aconteceu por acidente.</strong> Trocar <code>.html()</code> por <code>.text()</code>, na terça às 10:37, resolvia o problema inteiro. Durou 41 minutos, porque matava a funcionalidade de que todos gostavam.</li>
+    <li><strong>Segurança no cliente é opcional para o atacante.</strong> Todo filtro rodava no navegador de quem recebia. Bastava escrever direto no banco.</li>
+  </ul>
 
-				var pegarValor = function (valor) {
+  <h3>O retrato da época</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>no arquivo</th><th>o que conta sobre 2016</th></tr></thead>
+    <tbody>
+      <tr><td><code>new Firebase(url)</code></td><td>SDK 2.2.1, o Firebase de antes do Google I/O de maio de 2016, quando a plataforma foi relançada. O banco aceitava leitura e escrita de qualquer pessoa, que era o padrão dos tutoriais.</td></tr>
+      <tr><td>Material Design Lite</td><td>A biblioteca de componentes do Google para sites sem framework, no auge em 2015 e 2016. É de onde veio o rodapé de exemplo.</td></tr>
+      <tr><td>jQuery 2.2.3 com <code>integrity</code></td><td>A verificação de integridade de scripts (SRI) era novidade. O arquivo protege o jQuery contra adulteração na CDN e, logo abaixo, executa texto vindo do chat.</td></tr>
+      <tr><td>Crases e <code>=&gt;</code></td><td>Rafael usa template strings em abril de 2016, e em dezembro o arquivo já tem arrow functions e <code>**</code>. Dá para ver o ES2015 chegando ao dia a dia, commit a commit.</td></tr>
+      <tr><td><code>&lt;marquee&gt;</code></td><td>Já era peça de museu em 2016. Foi escolhido por isso.</td></tr>
+      <tr><td>Commits pelo site</td><td>Quase tudo se chama “Update index.html”: edição direto no GitHub, com o branch <code>gh-pages</code> publicando na hora.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
 
-				};
+<section id="recriacao">
+  <h2>A recriação</h2>
+  <p>O pedido foi recriar a ideia, só como simulação. O <code>chat-v2</code> faz isso com três decisões:</p>
+  <ul>
+    <li><strong>Sem rede e sem outras pessoas.</strong> Os colegas são personagens com roteiro, com nomes sorteados das listas de 2016 (das partes que dá para publicar). Nada do que você faz sai da página.</li>
+    <li><strong>Texto é sempre texto.</strong> O que se digita entra por <code>textContent</code>. Não há <code>innerHTML</code> com conteúdo digitado nem execução de código.</li>
+    <li><strong>As peças são uma lista fechada.</strong> Fundo, som, tremer, “oloco”, limpar e trocar de nome são funções prontas. Você escolhe qual disparar, e não o que ela faz. O som é gerado no navegador e só toca se você ligar.</li>
+  </ul>
+  <p>O que ficou igual é a sensação: nomes absurdos, cores por pessoa, a tela mudando sem você ter pedido, o aviso “executou um script!” e, no modo terminal, o texto verde digitado letra por letra. O botão “desfazer tudo” é a única coisa que o original nunca teve.</p>
+  <p class="note">O arquivo de 2016 está preservado no repositório como <code>original/index.html.txt</code>, em texto, para ser lido e não executado: publicado como página, ele voltaria a executar o que encontrasse no banco. O histórico de 132 commits veio junto, intacto. A simulação foi conferida no Chrome 152; Firefox e Safari não foram testados.</p>
+</section>
 
-				var start = pegarBaseMinima(numero);
+</main>
 
-				var temp;
+<footer>
+  <p>O chat nasceu em <a href="https://github.com/JonathanSantos-zz/chat">github.com/JonathanSantos-zz/chat</a>, no perfil antigo do Jonathan, escrito a seis mãos com <strong>Rafael Escobar</strong> e <strong>Giovanni Perillo</strong>, e com um quarto colega na sala. Esta edição vive em <a href="https://github.com/JonathanSantos/chat-v2">github.com/JonathanSantos/chat-v2</a>.</p>
+  <p>Trechos de código destacados pelo <a href="https://github.com/JonathanSantos/jonacode">Jonacode</a>. Da mesma série: <a href="https://jonathansantos.github.io/JongularJS-2.0/">JongularJS, 2015 → 2026</a>.</p>
+</footer>
 
-				if (start == 0) {
-					temp = parseInt(numero / base ** start);
-					str = baseChars[temp];
-				} else {
-					while (numero > 0) {
-						temp = base ** start;
+<script src="vendor/jonacode/jonacode.iife.min.js"></script>
+<script>
+(function () {
+  'use strict'
 
-						var resto = parseInt(numero / temp);
-						str += baseChars[resto];
+  // Idade do projeto, calculada ao abrir.
+  var born = new Date(2016, 3, 18)
+  var now = new Date()
+  var years = now.getFullYear() - born.getFullYear()
+  var months = now.getMonth() - born.getMonth()
+  var days = now.getDate() - born.getDate()
+  if (days < 0) { months--; days += new Date(now.getFullYear(), now.getMonth(), 0).getDate() }
+  if (months < 0) { years--; months += 12 }
+  var plural = function (count, one, many) { return count + ' ' + (count === 1 ? one : many) }
+  document.getElementById('age').textContent = plural(years, 'ano', 'anos') + ', ' + plural(months, 'mês', 'meses') + ' e ' + plural(days, 'dia', 'dias')
 
-						numero = numero - (temp * resto);
+  // Blocos de código com o Jonacode.
+  var darkQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  var styleElement = document.createElement('style')
+  document.head.appendChild(styleElement)
+  var snippets = Array.prototype.map.call(document.querySelectorAll('figure.code'), function (figure) {
+    var holder = document.createElement('div')
+    figure.appendChild(holder)
+    return { holder: holder, code: figure.querySelector('script').textContent.replace(/^\n|\n$/g, '') }
+  })
+  function paint() {
+    var theme = darkQuery.matches ? Jonacode.oneDark : Jonacode.oneLight
+    styleElement.textContent = Jonacode.highlightStyles(theme)
+    snippets.forEach(function (snippet) {
+      snippet.holder.innerHTML = Jonacode.highlight(snippet.code, Jonacode.javascript, { theme: theme, tabSize: 4 })
+    })
+  }
+  paint()
+  darkQuery.addEventListener('change', paint)
 
-						if (numero < base) {
-							str += baseChars[numero];
-							break;
-						}
-
-						start = pegarBaseMinima(numero);
-					}
-				}
-
-				return str;
-
-			};
-
-			var convertToInt = x => x.split('').map(
-				function (a) {
-					return a.charCodeAt(0);
-				}
-			);
-
-			var totals = function (frase) {
-				return frase.reduce(function(a, b){
-					return a + b;
-				});
-			};
-
-			var mediaDistancias = function (ints) {
-				return ints.reduce((x, y) => y = x > y ? Math.abs(x - y) + 1 : Math.abs(x - y) - 1);
-			};
-
-			var formatar = function (str, casas) {
-
-				str = str + '';
-				var totalCasas = casas - str.length;
-
-				for (var i = 0; i < totalCasas; i++) {
-					str = '0' + str;
-				}
-
-				return str;
-
-			};
-
-			function o (nome) {
-				var toInts = convertToInt(nome);
-				var total = totals(toInts);
-				var totalCaracteres = nome.length;
-				var mediaDistancia = mediaDistancias(toInts);
-
-				console.log(total, totalCaracteres, mediaDistancia);
-
-				var formatars = formatar(total, 6) + formatar(totalCaracteres, 4) + formatar(mediaDistancia, 3);
-
-				console.log(formatars);
-
-				return parseInt(formatars);
-
-			}
-
-			return transform(o(letters));
-
-		};
-		
-		var getLogin = function () {
-			return jd5(localStorage.getItem('userAdmin') || '');
-		};
-
-		var randomColor = function(){
-			var cores = ['FF2194', 'C821FF', '3F21FF', '67DBCE', 'FC4955', '209E2A', 'F58E27', 'C0E334', 'FF0000'];
-			if(!localStorage.getItem('cor_u')) {
-				var cor = cores[Math.floor(Math.random() * cores.length)];
-				localStorage.setItem('cor_u', cor);
-			}
-			return localStorage.getItem('cor_u');
-		};
-
-		myFire.limitToLast(25).on('child_added', function(snapshot) {
-				
-			var val = snapshot.val()
-
-			if(val.type == 'message'){
-				var t = val.t;
-				write('Anonymous - ', val.text, t);
-				$('.terminal').animate({ scrollTop: $('.terminal')[0].scrollHeight }, 500);
-			} else if (val.type == 'script') {
-				try{
-					if (getLogin() == 'f3,~p8') {
-						if (['Firebase','myFire','firebase','while(','for(','while (', 'for ('].filter(x => val.text.indexOf(x) != -1).length > 0) {
-						    write('Anonymous - ', 'Salvo de código maligno!: ' + '<div> '+ val.text +' </div>', 20);
-						    return;
-						}
-					}
-					
-					val.text = val.text.replace('--s ', '');
-					eval(val.text);
-					write(val.name + ' - ', 'Executou um script!', 20);
-				   }catch(e){console.log(e);};
-			} else if (val.type == 'altername') {
-				setNome(val.message);
-			}
-			
-				
-		});
-
-	</script>
+  // O filtro de 20/04/2016, como comparação de texto. Nada é executado.
+  var BLOCKED = ['for', 'while', 'remove', 'location', 'setTimeout', 'querido', 'localStorage', 'johnny']
+  var input = document.getElementById('filter-input')
+  var output = document.getElementById('filter-output')
+  function check() {
+    var normalized = input.value.toLowerCase().replace(' ', '').replace('"+"', '').replace("'+'", '')
+    var found = BLOCKED.filter(function (word) { return normalized.indexOf(word.toLowerCase()) !== -1 })
+    output.className = found.length ? 'blocked' : 'passed'
+    output.textContent = found.length
+      ? 'BLOQUEADO em 2016. Palavra encontrada: ' + found.join(', ')
+      : 'Passaria pelo filtro de 2016.'
+  }
+  input.addEventListener('input', check)
+  Array.prototype.forEach.call(document.querySelectorAll('.filter .chips button'), function (chip) {
+    chip.addEventListener('click', function () {
+      input.value = chip.textContent
+      check()
+    })
+  })
+  check()
+})()
+</script>
 </body>
 </html>
